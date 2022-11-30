@@ -21,29 +21,23 @@ Below is a list of contracts we use for this service:
 Installation
 ------------
 
-To run lockup service, install [Homebrew](https://brew.sh), [Node.js](https://nodejs.org), [Truffle](https://www.trufflesuite.com)) and pull the repository from `GitHub`:
+Install [Foundry](https://getfoundry.sh) and pull the repository from `GitHub`:
 
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
-    brew install node
-    npm install -g truffle
-    mkdir projects
-    cd projects
+    curl -L https://foundry.paradigm.xyz | bash
+    foundryup
     git clone https://github.com/p2p-org/p2p-eth2-depositor
     cd p2p-eth2-depositor
-    truffle init
-
-
-Setup your `truffle` environment, write migrations:
-
-    truffle develop
-    migrate --reset
 
 Deployment (Mainnet)
 ------------
 
-Smart contracts should be deployed with such constructor parameters:
-
-1. `P2pEth2Depositor.sol` _(true, 0x0000000000000000000000000000000000000000)_
+```bash    
+forge create --rpc-url https://mainnet.infura.io/v3/<YOUR INFURA KEY> \
+    --constructor-args true 0x0000000000000000000000000000000000000000 \
+    --private-key <YOUR PRIVATE KEY> src/P2pEth2Depositor.sol:P2pEth2Depositor \
+    --etherscan-api-key <YOUR ETHERSCAN API KEY> \
+    --verify
+```
 
 How to Use
 ------------
@@ -56,3 +50,5 @@ License
 =========
 
 MIT
+
+Code based on Abyss finance example https://github.com/abyssfinance/abyss-eth2depositor
