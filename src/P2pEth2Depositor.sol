@@ -4,15 +4,14 @@ pragma solidity 0.8.10;
 
 import "./@openzeppelin/contracts/access/Ownable.sol";
 import "./@openzeppelin/contracts/utils/Pausable.sol";
-import "./@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "./interfaces/IDepositContract.sol";
 
-contract P2pEth2Depositor is ReentrancyGuard, Pausable, Ownable {
+contract P2pEth2Depositor is Pausable, Ownable {
 
     /**
      * @dev Eth2 Deposit Contract address.
      */
-    IDepositContract public depositContract;
+    IDepositContract public immutable depositContract;
 
     /**
      * @dev Minimal and maximum amount of nodes per transaction.
@@ -32,13 +31,11 @@ contract P2pEth2Depositor is ReentrancyGuard, Pausable, Ownable {
      * @dev Setting Eth2 Smart Contract address during construction.
      */
     constructor(bool mainnet, address depositContract_) {
-        if (mainnet == true) {
-            depositContract = IDepositContract(0x00000000219ab540356cBB839Cbe05303d7705Fa);
-        } else if (depositContract_ == 0x0000000000000000000000000000000000000000) {
-            depositContract = IDepositContract(0x8c5fecdC472E27Bc447696F431E425D02dd46a8c);
-        } else {
-            depositContract = IDepositContract(depositContract_);
-        }
+        depositContract = mainnet
+            ? IDepositContract(0x00000000219ab540356cBB839Cbe05303d7705Fa)
+            : (depositContract_ == 0x0000000000000000000000000000000000000000)
+                ? IDepositContract(0x8c5fecdC472E27Bc447696F431E425D02dd46a8c)
+                : IDepositContract(depositContract_);
     }
 
     /**
@@ -80,7 +77,7 @@ contract P2pEth2Depositor is ReentrancyGuard, Pausable, Ownable {
             require(withdrawal_credentials[i].length == credentialsLength, "P2pEth2Depositor: wrong withdrawal credentials");
             require(signatures[i].length == signatureLength, "P2pEth2Depositor: wrong signatures");
 
-            IDepositContract(address(depositContract)).deposit{value: collateral}(
+            depositContract.deposit{value: collateral}(
                 pubkeys[i],
                 withdrawal_credentials[i],
                 signatures[i],
