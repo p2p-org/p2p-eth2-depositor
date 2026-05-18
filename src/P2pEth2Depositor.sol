@@ -33,12 +33,10 @@ contract P2pEth2Depositor is Pausable, Ownable {
     /**
      * @dev Setting Eth2 Smart Contract address during construction.
      */
-    constructor(bool mainnet, address depositContract_) Ownable(msg.sender) {
-        depositContract = mainnet
+    constructor(address depositContract_) Ownable(msg.sender) {
+        depositContract = depositContract_ == 0x0000000000000000000000000000000000000000
             ? IDepositContract(0x00000000219ab540356cBB839Cbe05303d7705Fa)
-            : (depositContract_ == 0x0000000000000000000000000000000000000000)
-                ? IDepositContract(0x8c5fecdC472E27Bc447696F431E425D02dd46a8c)
-                : IDepositContract(depositContract_);
+            : IDepositContract(depositContract_);
     }
 
     /**
@@ -84,9 +82,7 @@ contract P2pEth2Depositor is Pausable, Ownable {
         uint256 totalAmount = amount * validatorCount;
         require(msg.value == totalAmount, "P2pEth2Depositor: ETH sent must equal sum of amounts");
 
-        uint64 firstValidatorId = depositCountToUint64(depositContract.get_deposit_count()) + 1;
-
-        for (uint256 i = 0; i < validatorCount;) {
+        for (uint256 i = 0; i < validatorCount; ++i) {
             require(pubkeys[i].length == pubkeyLength, "P2pEth2Depositor: wrong pubkey");
             require(signatures[i].length == signatureLength, "P2pEth2Depositor: wrong signatures");
 
@@ -96,48 +92,9 @@ contract P2pEth2Depositor is Pausable, Ownable {
                 signatures[i],
                 deposit_data_roots[i]
             );
-
-            unchecked {
-                ++i;
-            }
         }
 
-        emit DepositEvent(msg.sender, validatorCount, totalAmount, firstValidatorId);
-    }
-
-    /**
-     * @dev Convert deposit_count from ETH2 DepositContract to uint64.
-     *      ETH2 DepositContract returns little-endian 64-bit count in a bytes blob; bytes are inverted in memory layout vs uint64.
-     */
-    function depositCountToUint64(bytes memory b) internal pure returns (uint64) {
-        uint64 result;
-        assembly {
-            let x := mload(add(b, 8))
-
-            result := or(
-                or(
-                    or(
-                        and(0xff, shr(56, x)),
-                        and(0xff00, shr(40, x))
-                    ),
-                    or(
-                        and(0xff0000, shr(24, x)),
-                        and(0xff000000, shr(8, x))
-                    )
-                ),
-                or(
-                    or(
-                        and(0xff00000000, shl(8, x)),
-                        and(0xff0000000000, shl(24, x))
-                    ),
-                    or(
-                        and(0xff000000000000, shl(40, x)),
-                        and(0xff00000000000000, shl(56, x))
-                    )
-                )
-            )
-        }
-        return result;
+        emit DepositEvent(msg.sender, validatorCount, totalAmount);
     }
 
     /**
@@ -165,7 +122,6 @@ contract P2pEth2Depositor is Pausable, Ownable {
     event DepositEvent(
         address indexed from,
         uint256 validatorCount,
-        uint256 totalAmount,
-        uint64 firstValidatorId
+        uint256 totalAmount
     );
 }

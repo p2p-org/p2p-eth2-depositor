@@ -33,7 +33,7 @@ Deployment (Mainnet)
 
 ```bash    
 forge create --rpc-url https://mainnet.infura.io/v3/<YOUR INFURA KEY> \
-    --constructor-args true 0x0000000000000000000000000000000000000000 \
+    --constructor-args 0x0000000000000000000000000000000000000000 \
     --private-key <YOUR PRIVATE KEY> src/P2pEth2Depositor.sol:P2pEth2Depositor \
     --etherscan-api-key <YOUR ETHERSCAN API KEY> \
     --verify
@@ -50,7 +50,7 @@ The batch `amount` must not exceed **2048 ETH** per validator. There is **no min
 
 Deposits **strictly above 32 ETH** reject withdrawal credentials whose first byte is execution-withdrawal **`0x01`**. Other prefixes such as **`0x00`**, **`0x02`**, and future 32-byte credential formats are allowed. Deposits **at most 32 ETH** remain credential-type independent aside from length.
 
-On success, the contract emits **`DepositEvent(from, validatorCount, totalAmount, firstValidatorId)`**, where **`firstValidatorId`** is derived from the official deposit contract’s `get_deposit_count()` before the batch (useful for indexers mapping the batch to validator indices).
+On success, the contract emits **`DepositEvent(from, validatorCount, totalAmount)`**.
 
 This wrapper does not replicate every protocol rule: the official deposit contract may still revert on amounts or deposit data that consensus rejects.
 

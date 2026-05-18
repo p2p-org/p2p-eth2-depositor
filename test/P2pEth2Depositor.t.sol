@@ -39,7 +39,7 @@ contract P2pEth2DepositorTest is Test {
     function setUp() public {
         vm.deal(address(this), 100_000 ether);
         depositSink = new DepositReceiver();
-        depositor = new P2pEth2Depositor(false, address(depositSink));
+        depositor = new P2pEth2Depositor(address(depositSink));
     }
 
     function testZeroValidatorsReverts() public {
@@ -257,7 +257,7 @@ contract P2pEth2DepositorTest is Test {
         assertFalse(success);
     }
 
-    function testDepositEmitsFirstValidatorId() public {
+    function testDepositEmitsEvent() public {
         (
             bytes[] memory pubkeys,
             bytes memory withdrawalCredentials,
@@ -267,7 +267,7 @@ contract P2pEth2DepositorTest is Test {
         ) = _multiDepositData(1, 32 ether, 0x01);
 
         vm.expectEmit(true, true, true, true);
-        emit P2pEth2Depositor.DepositEvent(address(this), 1, 32 ether, 1);
+        emit P2pEth2Depositor.DepositEvent(address(this), 1, 32 ether);
 
         depositor.deposit{value: 32 ether}(pubkeys, withdrawalCredentials, signatures, depositDataRoots, amount);
     }
