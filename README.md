@@ -1,7 +1,7 @@
 P2P Eth2 Depositor
 =========
 
-P2P Eth2 Depositor allows convenient way to send 1 to 100 deposits in one transaction to Eth2 Deposit Contract.
+P2P Eth2 Depositor allows a convenient way to send **1 to 400** deposits in one transaction to the Eth2 Deposit Contract.
 
 Contracts
 =========
@@ -15,7 +15,7 @@ Below is a list of contracts we use for this service:
 
 <dl>
   <dt>P2pEth2Depositor</dt>
-  <dd>A smart contract that forwards variable per-validator deposit amounts (capped at 2048 ETH per entry) and sends up to 100 deposit calls per transaction to Eth2 Deposit Contract.</dd>
+  <dd>A smart contract that forwards the same per-validator deposit amount for every entry in a batch (capped at <strong>2048 ETH</strong> per validator) and sends up to <strong>400</strong> deposit calls per transaction to the Eth2 Deposit Contract. Each transaction uses one <code>withdrawal_credentials</code> value (same type for all validators in that batch, e.g. <code>0x01</code> or <code>0x02</code>).</dd>
 </dl>
 
 Installation
@@ -42,17 +42,24 @@ forge create --rpc-url https://mainnet.infura.io/v3/<YOUR INFURA KEY> \
 How to Use
 ------------
 
-1. Choose amount of Eth2 validator nodes you want to create.
-2. Create arrays with your pubkeys, withdrawal_credentials, signatures, calldata deposit_data_roots, and deposit amounts.
-3. Use _deposit()_ function on `P2pEth2Depositor` with `msg.value` equal to the sum of all values in `amounts`.
+1. Choose the number of Eth2 validator nodes you want to create in one batch (1–400).
+2. Build arrays of `pubkeys`, `signatures`, and `deposit_data_roots` (length = number of validators). Provide a single 32-byte `withdrawal_credentials` blob shared by all validators in the batch, and a single `amount` (ETH per validator).
+3. Call `deposit` on `P2pEth2Depositor` with `msg.value` equal to **`amount * number_of_validators`**.
 
-Each value in `amounts` must not exceed **2048 ETH**. There is **no minimum** enforced by this contract; use amounts appropriate for your chain and tooling.
+The batch `amount` must not exceed **2048 ETH** per validator. There is **no minimum** enforced by this contract; use amounts appropriate for your chain and tooling.
 
 Deposits **strictly above 32 ETH** reject withdrawal credentials whose first byte is execution-withdrawal **`0x01`**. Other prefixes such as **`0x00`**, **`0x02`**, and future 32-byte credential formats are allowed. Deposits **at most 32 ETH** remain credential-type independent aside from length.
 
+On success, the contract emits **`DepositEvent(from, validatorCount, totalAmount, firstValidatorId)`**, where **`firstValidatorId`** is derived from the official deposit contract’s `get_deposit_count()` before the batch (useful for indexers mapping the batch to validator indices).
+
 This wrapper does not replicate every protocol rule: the official deposit contract may still revert on amounts or deposit data that consensus rejects.
 
-Important: `deposit_data_root` must be generated from the exact deposit data, including the exact amount being deposited. Do not fake or reuse a 32 ETH `deposit_data_root` for variable deposits.
+Important: each `deposit_data_root` must be generated from the exact deposit data, including the exact `amount` and the shared `withdrawal_credentials`. Do not fake or reuse a 32 ETH `deposit_data_root` for different amounts.
+
+Tests
+------------
+
+Foundry tests live in `test/P2pEth2Depositor.t.sol`. They use a minimal in-file `IDepositContract` implementation to assert that `deposit` forwards calls correctly; the canonical Eth2 deposit contract is not substituted in tests.
 
 License
 =========

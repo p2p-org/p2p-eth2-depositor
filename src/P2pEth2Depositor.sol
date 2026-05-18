@@ -17,15 +17,15 @@ contract P2pEth2Depositor is Pausable, Ownable {
      * @dev Minimum and maximum number of validators (deposit entries) per transaction.
      */
     uint256 public constant minValidatorsPerTx = 1;
-    uint256 public constant maxValidatorsPerTx = 100;
+    uint256 public constant maxValidatorsPerTx = 400;
     uint256 public constant pubkeyLength = 48;
     uint256 public constant credentialsLength = 32;
     uint256 public constant signatureLength = 96;
     bytes1 public constant ETH1_WITHDRAWAL_PREFIX = 0x01;
 
     /**
-     * @dev Per-validator deposit upper bound (`amounts[i] <= maxCollateral`).
-     * `collateral` is the 32 ETH threshold used only for the large-deposit withdrawal-credentials guard (`amounts[i] > collateral`).
+     * @dev Per-validator deposit upper bound (`amount <= maxCollateral`).
+     * `collateral` is the 32 ETH threshold used only for the large-deposit withdrawal-credentials guard (`amount > collateral`).
      */
     uint256 public constant collateral = 32 ether;
     uint256 public constant maxCollateral = 2048 ether;
@@ -51,61 +51,93 @@ contract P2pEth2Depositor is Pausable, Ownable {
     /**
      * @dev Function that allows up to maxValidatorsPerTx validators per transaction.
      *
-     * - pubkeys                - Array of BLS12-381 public keys.
-     * - withdrawal_credentials - Array of commitments to a public keys for withdrawals.
-     * - signatures             - Array of BLS12-381 signatures.
-     * - deposit_data_roots     - Array of the SHA-256 hashes of the SSZ-encoded DepositData objects.
-     * - amounts                - Array of ETH amounts for each validator deposit.
+     * - pubkeys                 - Array of BLS12-381 public keys.
+     * - withdrawal_credentials  - Same 32-byte commitment for every validator in the batch (one credential type per tx).
+     * - signatures              - Array of BLS12-381 signatures.
+     * - deposit_data_roots      - Array of the SHA-256 hashes of the SSZ-encoded DepositData objects.
+     * - amount                  - ETH amount per validator; msg.value must equal amount * pubkeys.length.
      */
     function deposit(
         bytes[] calldata pubkeys,
-        bytes[] calldata withdrawal_credentials,
+        bytes calldata withdrawal_credentials,
         bytes[] calldata signatures,
         bytes32[] calldata deposit_data_roots,
-        uint256[] calldata amounts
+        uint256 amount
     ) external payable whenNotPaused {
 
         uint256 validatorCount = pubkeys.length;
 
         require(
             validatorCount >= minValidatorsPerTx && validatorCount <= maxValidatorsPerTx,
-            "P2pEth2Depositor: you can deposit only 1 to 100 validators per transaction"
+            "P2pEth2Depositor: you can deposit only 1 to 400 validators per transaction"
         );
         require(
-            withdrawal_credentials.length == validatorCount &&
             signatures.length == validatorCount &&
-            deposit_data_roots.length == validatorCount &&
-            amounts.length == validatorCount,
+            deposit_data_roots.length == validatorCount,
             "P2pEth2Depositor: amount of parameters do no match");
-
-        uint256 totalAmount = 0;
-
-        for (uint256 i = 0; i < validatorCount; ++i) {
-            require(pubkeys[i].length == pubkeyLength, "P2pEth2Depositor: wrong pubkey");
-            require(withdrawal_credentials[i].length == credentialsLength, "P2pEth2Depositor: wrong withdrawal credentials");
-            require(signatures[i].length == signatureLength, "P2pEth2Depositor: wrong signatures");
-            require(amounts[i] <= maxCollateral, "P2pEth2Depositor: amount is above maximum");
-
-            if (amounts[i] > collateral) {
-                require(withdrawal_credentials[i][0] != ETH1_WITHDRAWAL_PREFIX, "P2pEth2Depositor: large deposit cannot use 0x01");
-            }
-
-            totalAmount += amounts[i];
+        require(withdrawal_credentials.length == credentialsLength, "P2pEth2Depositor: wrong withdrawal credentials");
+        require(amount <= maxCollateral, "P2pEth2Depositor: amount is above maximum");
+        if (amount > collateral) {
+            require(withdrawal_credentials[0] != ETH1_WITHDRAWAL_PREFIX, "P2pEth2Depositor: large deposit cannot use 0x01");
         }
 
+        uint256 totalAmount = amount * validatorCount;
         require(msg.value == totalAmount, "P2pEth2Depositor: ETH sent must equal sum of amounts");
 
-        for (uint256 i = 0; i < validatorCount; ++i) {
-            depositContract.deposit{value: amounts[i]}(
+        uint64 firstValidatorId = depositCountToUint64(depositContract.get_deposit_count()) + 1;
+
+        for (uint256 i = 0; i < validatorCount;) {
+            require(pubkeys[i].length == pubkeyLength, "P2pEth2Depositor: wrong pubkey");
+            require(signatures[i].length == signatureLength, "P2pEth2Depositor: wrong signatures");
+
+            depositContract.deposit{value: amount}(
                 pubkeys[i],
-                withdrawal_credentials[i],
+                withdrawal_credentials,
                 signatures[i],
                 deposit_data_roots[i]
             );
 
+            unchecked {
+                ++i;
+            }
         }
 
-        emit DepositEvent(msg.sender, validatorCount, totalAmount);
+        emit DepositEvent(msg.sender, validatorCount, totalAmount, firstValidatorId);
+    }
+
+    /**
+     * @dev Convert deposit_count from ETH2 DepositContract to uint64.
+     *      ETH2 DepositContract returns little-endian 64-bit count in a bytes blob; bytes are inverted in memory layout vs uint64.
+     */
+    function depositCountToUint64(bytes memory b) internal pure returns (uint64) {
+        uint64 result;
+        assembly {
+            let x := mload(add(b, 8))
+
+            result := or(
+                or(
+                    or(
+                        and(0xff, shr(56, x)),
+                        and(0xff00, shr(40, x))
+                    ),
+                    or(
+                        and(0xff0000, shr(24, x)),
+                        and(0xff000000, shr(8, x))
+                    )
+                ),
+                or(
+                    or(
+                        and(0xff00000000, shl(8, x)),
+                        and(0xff0000000000, shl(24, x))
+                    ),
+                    or(
+                        and(0xff000000000000, shl(40, x)),
+                        and(0xff00000000000000, shl(56, x))
+                    )
+                )
+            )
+        }
+        return result;
     }
 
     /**
@@ -130,5 +162,10 @@ contract P2pEth2Depositor is Pausable, Ownable {
         _unpause();
     }
 
-    event DepositEvent(address indexed from, uint256 validatorCount, uint256 totalAmount);
+    event DepositEvent(
+        address indexed from,
+        uint256 validatorCount,
+        uint256 totalAmount,
+        uint64 firstValidatorId
+    );
 }
