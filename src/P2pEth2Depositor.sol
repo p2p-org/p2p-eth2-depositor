@@ -11,7 +11,7 @@ contract P2pEth2Depositor is Pausable, Ownable {
     /**
      * @dev Eth2 Deposit Contract address.
      */
-    IDepositContract public immutable depositContract;
+    IDepositContract public constant depositContract = IDepositContract(0x00000000219ab540356cBB839Cbe05303d7705Fa);
 
     /**
      * @dev Minimum and maximum number of validators (deposit entries) per transaction.
@@ -30,14 +30,7 @@ contract P2pEth2Depositor is Pausable, Ownable {
     uint256 public constant collateral = 32 ether;
     uint256 public constant maxCollateral = 2048 ether;
 
-    /**
-     * @dev Setting Eth2 Smart Contract address during construction.
-     */
-    constructor(address depositContract_) Ownable(msg.sender) {
-        depositContract = depositContract_ == 0x0000000000000000000000000000000000000000
-            ? IDepositContract(0x00000000219ab540356cBB839Cbe05303d7705Fa)
-            : IDepositContract(depositContract_);
-    }
+    constructor() Ownable(msg.sender) {}
 
     /**
      * @dev This contract will not accept direct ETH transactions.

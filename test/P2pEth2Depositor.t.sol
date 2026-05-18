@@ -33,13 +33,17 @@ contract DepositReceiver is IDepositContract {
 }
 
 contract P2pEth2DepositorTest is Test {
+    address private constant DEPOSIT_CONTRACT = 0x00000000219ab540356cBB839Cbe05303d7705Fa;
+
     DepositReceiver private depositSink;
     P2pEth2Depositor private depositor;
 
     function setUp() public {
         vm.deal(address(this), 100_000 ether);
-        depositSink = new DepositReceiver();
-        depositor = new P2pEth2Depositor(address(depositSink));
+        DepositReceiver receiver = new DepositReceiver();
+        vm.etch(DEPOSIT_CONTRACT, address(receiver).code);
+        depositSink = DepositReceiver(DEPOSIT_CONTRACT);
+        depositor = new P2pEth2Depositor();
     }
 
     function testZeroValidatorsReverts() public {

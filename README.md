@@ -33,7 +33,6 @@ Deployment (Mainnet)
 
 ```bash    
 forge create --rpc-url https://mainnet.infura.io/v3/<YOUR INFURA KEY> \
-    --constructor-args 0x0000000000000000000000000000000000000000 \
     --private-key <YOUR PRIVATE KEY> src/P2pEth2Depositor.sol:P2pEth2Depositor \
     --etherscan-api-key <YOUR ETHERSCAN API KEY> \
     --verify
