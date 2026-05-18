@@ -58,7 +58,14 @@ Important: each `deposit_data_root` must be generated from the exact deposit dat
 Tests
 ------------
 
-Foundry tests live in `test/P2pEth2Depositor.t.sol`. They use a minimal in-file `IDepositContract` implementation to assert that `deposit` forwards calls correctly; the canonical Eth2 deposit contract is not substituted in tests.
+Foundry tests live in `test/P2pEth2Depositor.t.sol`. Unit tests cover validation paths that revert before calling the canonical Eth2 deposit contract.
+
+Fork tests replay static deposit fixtures copied from recent successful mainnet and Hoodi DepositContract transactions. They do not mock or replace the canonical DepositContract. Set the corresponding RPC URL to run them:
+
+```bash
+ETH_RPC_URL_MAINNET=<mainnet_rpc> forge test --match-contract P2pEth2DepositorForkTest -vv
+ETH_RPC_URL_HOODI=<hoodi_rpc> forge test --match-contract P2pEth2DepositorForkTest -vv
+```
 
 License
 =========
