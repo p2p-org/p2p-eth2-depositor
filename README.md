@@ -33,10 +33,14 @@ Deployment (Mainnet)
 
 ```bash    
 forge create --rpc-url https://mainnet.infura.io/v3/<YOUR INFURA KEY> \
-    --private-key <YOUR PRIVATE KEY> src/P2pEth2Depositor.sol:P2pEth2Depositor \
+    --private-key <YOUR PRIVATE KEY> \
+    src/P2pEth2Depositor.sol:P2pEth2Depositor \
+    --constructor-args 0x00000000219ab540356cBB839Cbe05303d7705Fa \
     --etherscan-api-key <YOUR ETHERSCAN API KEY> \
     --verify
 ```
+
+Pass the canonical DepositContract address for the target network as the constructor argument. Ethereum mainnet and Hoodi both use `0x00000000219ab540356cBB839Cbe05303d7705Fa`.
 
 How to Use
 ------------

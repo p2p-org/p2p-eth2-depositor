@@ -12,7 +12,7 @@ contract P2pEth2DepositorTest is Test {
 
     function setUp() public {
         vm.deal(address(this), 100_000 ether);
-        depositor = new P2pEth2Depositor();
+        depositor = new P2pEth2Depositor(address(this));
     }
 
     function testZeroValidatorsReverts() public {
@@ -212,6 +212,20 @@ contract P2pEth2DepositorTest is Test {
         assertFalse(success);
     }
 
+    function testConstructorRevertsOnZeroAddress() public {
+        vm.expectRevert(bytes("P2pEth2Depositor: zero deposit contract"));
+        new P2pEth2Depositor(address(0));
+    }
+
+    function testConstructorRevertsOnNoCode() public {
+        vm.expectRevert(bytes("P2pEth2Depositor: deposit contract has no code"));
+        new P2pEth2Depositor(address(0xBEEF));
+    }
+
+    function testConstructorStoresDepositContract() public view {
+        require(address(depositor.depositContract()) == address(this), "wrong deposit contract");
+    }
+
     function _multiDepositData(uint256 n, uint256 amount, bytes1 withdrawalPrefix)
         internal
         pure
@@ -294,7 +308,7 @@ contract P2pEth2DepositorForkTest is Test {
 
             vm.createSelectFork(rpcUrl);
             vm.deal(address(this), 1_000_000 ether);
-            depositor = new P2pEth2Depositor();
+            depositor = new P2pEth2Depositor(CANONICAL_DEPOSIT_CONTRACT);
             return true;
         } catch {
             emit log(string.concat("Skipping fork test: ", rpcEnvVar, " is not set"));

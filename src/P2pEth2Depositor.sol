@@ -9,9 +9,9 @@ import "./interfaces/IDepositContract.sol";
 contract P2pEth2Depositor is Pausable, Ownable {
 
     /**
-     * @dev Eth2 Deposit Contract address.
+     * @dev Eth2 Deposit Contract address set at deployment.
      */
-    IDepositContract public constant depositContract = IDepositContract(0x00000000219ab540356cBB839Cbe05303d7705Fa);
+    IDepositContract public immutable depositContract;
 
     /**
      * @dev Minimum and maximum number of validators (deposit entries) per transaction.
@@ -30,7 +30,11 @@ contract P2pEth2Depositor is Pausable, Ownable {
     uint256 public constant collateral = 32 ether;
     uint256 public constant maxCollateral = 2048 ether;
 
-    constructor() Ownable(msg.sender) {}
+    constructor(address depositContract_) Ownable(msg.sender) {
+        require(depositContract_ != address(0), "P2pEth2Depositor: zero deposit contract");
+        require(depositContract_.code.length > 0, "P2pEth2Depositor: deposit contract has no code");
+        depositContract = IDepositContract(depositContract_);
+    }
 
     /**
      * @dev This contract will not accept direct ETH transactions.
