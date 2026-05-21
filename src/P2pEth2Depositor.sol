@@ -42,7 +42,7 @@ contract P2pEth2Depositor is Pausable, Ownable {
     /**
      * @dev Function that allows up to maxValidatorsPerTx validators per transaction.
      *
-     * - pubkeys                 - Array of BLS12-381 public keys.
+     * - pubkeys                 - Array of unique BLS12-381 public keys.
      * - withdrawal_credentials  - Same 32-byte commitment for every validator in the batch (one credential type per tx).
      * - signatures              - Array of BLS12-381 signatures.
      * - deposit_data_roots      - Array of the SHA-256 hashes of the SSZ-encoded DepositData objects.
@@ -75,10 +75,19 @@ contract P2pEth2Depositor is Pausable, Ownable {
         uint256 totalAmount = amount * validatorCount;
         require(msg.value == totalAmount, "P2pEth2Depositor: ETH sent must equal sum of amounts");
 
+        bytes32[] memory pubkeyHashes = new bytes32[](validatorCount);
         for (uint256 i = 0; i < validatorCount; ++i) {
             require(pubkeys[i].length == pubkeyLength, "P2pEth2Depositor: wrong pubkey");
             require(signatures[i].length == signatureLength, "P2pEth2Depositor: wrong signatures");
 
+            bytes32 pubkeyHash = keccak256(pubkeys[i]);
+            for (uint256 j = 0; j < i; ++j) {
+                require(pubkeyHash != pubkeyHashes[j], "P2pEth2Depositor: duplicate pubkey");
+            }
+            pubkeyHashes[i] = pubkeyHash;
+        }
+
+        for (uint256 i = 0; i < validatorCount; ++i) {
             depositContract.deposit{value: amount}(
                 pubkeys[i],
                 withdrawal_credentials,

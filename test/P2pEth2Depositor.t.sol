@@ -142,6 +142,19 @@ contract P2pEth2DepositorTest is Test {
         depositor.deposit{value: 32 ether}(pubkeys, withdrawalCredentials, signatures, depositDataRoots, amount);
     }
 
+    function testDuplicatePubkeysReverts() public {
+        (
+            bytes[] memory pubkeys,
+            bytes memory withdrawalCredentials,
+            bytes[] memory signatures,
+            bytes32[] memory depositDataRoots,
+            uint256 amount
+        ) = _multiDepositData(2, 32 ether, 0x01);
+
+        vm.expectRevert(bytes("P2pEth2Depositor: duplicate pubkey"));
+        depositor.deposit{value: 64 ether}(pubkeys, withdrawalCredentials, signatures, depositDataRoots, amount);
+    }
+
     function testPauseUnpauseStateAndPausedDepositRevert() public {
         (
             bytes[] memory pubkeys,
@@ -304,7 +317,7 @@ contract P2pEth2DepositorForkTest is Test {
         _assertCanonicalDepositEvents(entries, validatorCount, amount);
     }
 
-    function _assertWrapperDepositEvent(Vm.Log[] memory entries, uint256 validatorCount, uint256 totalAmount) internal {
+    function _assertWrapperDepositEvent(Vm.Log[] memory entries, uint256 validatorCount, uint256 totalAmount) internal view {
         bytes32 indexedSender = bytes32(uint256(uint160(address(this))));
 
         for (uint256 i; i < entries.length; ++i) {
@@ -314,16 +327,16 @@ contract P2pEth2DepositorForkTest is Test {
             ) {
                 (uint256 emittedValidatorCount, uint256 emittedTotalAmount) =
                     abi.decode(entries[i].data, (uint256, uint256));
-                assertEq(emittedValidatorCount, validatorCount);
-                assertEq(emittedTotalAmount, totalAmount);
+                require(emittedValidatorCount == validatorCount, "wrong wrapper validator count");
+                require(emittedTotalAmount == totalAmount, "wrong wrapper total amount");
                 return;
             }
         }
 
-        fail("wrapper DepositEvent not emitted");
+        revert("wrapper DepositEvent not emitted");
     }
 
-    function _assertCanonicalDepositEvents(Vm.Log[] memory entries, uint256 validatorCount, uint256 amount) internal {
+    function _assertCanonicalDepositEvents(Vm.Log[] memory entries, uint256 validatorCount, uint256 amount) internal pure {
         uint256 expectedAmountGwei = amount / 1 gwei;
         uint256 observedEvents;
 
@@ -333,12 +346,12 @@ contract P2pEth2DepositorForkTest is Test {
                     && entries[i].topics[0] == CANONICAL_DEPOSIT_EVENT_TOPIC
             ) {
                 (,, bytes memory encodedAmount,,) = abi.decode(entries[i].data, (bytes, bytes, bytes, bytes, bytes));
-                assertEq(_decodeLittleEndianUint64(encodedAmount), expectedAmountGwei);
+                require(_decodeLittleEndianUint64(encodedAmount) == expectedAmountGwei, "wrong canonical amount");
                 observedEvents += 1;
             }
         }
 
-        assertEq(observedEvents, validatorCount);
+        require(observedEvents == validatorCount, "wrong canonical event count");
     }
 
     function _decodeLittleEndianUint64(bytes memory encodedAmount) internal pure returns (uint256 amount) {
