@@ -189,6 +189,23 @@ contract P2pEth2DepositorTest is Test {
         depositor.unpause();
     }
 
+    function testCannotRenounceOwnershipWhilePaused() public {
+        depositor.pause();
+
+        vm.expectRevert(bytes("P2pEth2Depositor: cannot renounce while paused"));
+        depositor.renounceOwnership();
+
+        assertEq(depositor.owner(), address(this));
+        depositor.unpause();
+        assertFalse(depositor.paused());
+    }
+
+    function testCanRenounceOwnershipWhenUnpaused() public {
+        depositor.renounceOwnership();
+
+        assertEq(depositor.owner(), address(0));
+    }
+
     function testDirectEthTransferReverts() public {
         (bool success,) = address(depositor).call{value: 1 ether}("");
 

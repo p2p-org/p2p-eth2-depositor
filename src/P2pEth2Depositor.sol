@@ -121,6 +121,14 @@ contract P2pEth2Depositor is Pausable, Ownable {
         _unpause();
     }
 
+    /**
+     * @dev Renouncing ownership while paused would leave the wrapper permanently paused.
+     */
+    function renounceOwnership() public override onlyOwner {
+        require(!paused(), "P2pEth2Depositor: cannot renounce while paused");
+        super.renounceOwnership();
+    }
+
     event DepositEvent(
         address indexed from,
         uint256 validatorCount,
