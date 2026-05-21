@@ -207,19 +207,6 @@ contract P2pEth2DepositorTest is Test {
         depositor.deposit{value: 32 ether}(pubkeys, withdrawalCredentials, signatures, depositDataRoots, amount);
     }
 
-    function testDuplicatePubkeysReverts() public {
-        (
-            bytes[] memory pubkeys,
-            bytes memory withdrawalCredentials,
-            bytes[] memory signatures,
-            bytes32[] memory depositDataRoots,
-            uint256 amount
-        ) = _multiDepositData(2, 32 ether, 0x01);
-
-        vm.expectRevert(bytes("P2pEth2Depositor: duplicate pubkey"));
-        depositor.deposit{value: 64 ether}(pubkeys, withdrawalCredentials, signatures, depositDataRoots, amount);
-    }
-
     function testPauseUnpauseStateAndPausedDepositRevert() public {
         (
             bytes[] memory pubkeys,

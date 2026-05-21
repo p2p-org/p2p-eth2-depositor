@@ -46,12 +46,12 @@ How to Use
 ------------
 
 1. Choose the number of Eth2 validator nodes you want to create in one batch (1–400).
-2. Build arrays of `pubkeys`, `signatures`, and `deposit_data_roots` (length = number of validators). Each pubkey in the batch must be unique. Provide a single 32-byte `withdrawal_credentials` blob shared by all validators in the batch, and a single `amount` (ETH per validator).
+2. Build arrays of `pubkeys`, `signatures`, and `deposit_data_roots` (length = number of validators). Provide a single 32-byte `withdrawal_credentials` blob shared by all validators in the batch, and a single `amount` (ETH per validator).
 3. Call `deposit` on `P2pEth2Depositor` with `msg.value` equal to **`amount * number_of_validators`**.
 
 The batch `amount` must be at least **1 ETH** per validator, divisible by **1 gwei**, and no more than **2048 ETH** per validator.
 
-Duplicate pubkeys in one transaction will revert because repeated pubkeys top up an existing validator instead of creating distinct validators.
+ Operators should ensure pubkeys are unique off-chain because repeated pubkeys can top up an existing validator instead of creating distinct validators.
 
 Deposits **strictly above 32 ETH** require compounding withdrawal credentials whose first byte is **`0x02`**. Deposits **at most 32 ETH** remain credential-type independent aside from length.
 
