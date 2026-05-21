@@ -21,7 +21,7 @@ contract P2pEth2Depositor is Pausable, Ownable {
     uint256 public constant pubkeyLength = 48;
     uint256 public constant credentialsLength = 32;
     uint256 public constant signatureLength = 96;
-    bytes1 public constant ETH1_WITHDRAWAL_PREFIX = 0x01;
+    bytes1 public constant COMPOUNDING_WITHDRAWAL_PREFIX = 0x02;
 
     /**
      * @dev Per-validator deposit upper bound (`amount <= maxCollateral`).
@@ -73,7 +73,10 @@ contract P2pEth2Depositor is Pausable, Ownable {
         require(withdrawal_credentials.length == credentialsLength, "P2pEth2Depositor: wrong withdrawal credentials");
         require(amount <= maxCollateral, "P2pEth2Depositor: amount is above maximum");
         if (amount > collateral) {
-            require(withdrawal_credentials[0] != ETH1_WITHDRAWAL_PREFIX, "P2pEth2Depositor: large deposit cannot use 0x01");
+            require(
+                withdrawal_credentials[0] == COMPOUNDING_WITHDRAWAL_PREFIX,
+                "P2pEth2Depositor: large deposit requires 0x02"
+            );
         }
 
         uint256 totalAmount = amount * validatorCount;

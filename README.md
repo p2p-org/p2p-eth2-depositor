@@ -53,7 +53,7 @@ The batch `amount` must not exceed **2048 ETH** per validator. There is **no min
 
 Duplicate pubkeys in one transaction will revert because repeated pubkeys top up an existing validator instead of creating distinct validators.
 
-Deposits **strictly above 32 ETH** reject withdrawal credentials whose first byte is execution-withdrawal **`0x01`**. Other prefixes such as **`0x00`**, **`0x02`**, and future 32-byte credential formats are allowed. Deposits **at most 32 ETH** remain credential-type independent aside from length.
+Deposits **strictly above 32 ETH** require compounding withdrawal credentials whose first byte is **`0x02`**. Deposits **at most 32 ETH** remain credential-type independent aside from length.
 
 On success, the contract emits **`DepositEvent(from, validatorCount, totalAmount)`**.
 

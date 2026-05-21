@@ -69,7 +69,33 @@ contract P2pEth2DepositorTest is Test {
             uint256 amount
         ) = _multiDepositData(1, 65 ether, 0x01);
 
-        vm.expectRevert(bytes("P2pEth2Depositor: large deposit cannot use 0x01"));
+        vm.expectRevert(bytes("P2pEth2Depositor: large deposit requires 0x02"));
+        depositor.deposit{value: 65 ether}(pubkeys, withdrawalCredentials, signatures, depositDataRoots, amount);
+    }
+
+    function testDeposit65EthWith0x00CredentialsReverts() public {
+        (
+            bytes[] memory pubkeys,
+            bytes memory withdrawalCredentials,
+            bytes[] memory signatures,
+            bytes32[] memory depositDataRoots,
+            uint256 amount
+        ) = _multiDepositData(1, 65 ether, 0x00);
+
+        vm.expectRevert(bytes("P2pEth2Depositor: large deposit requires 0x02"));
+        depositor.deposit{value: 65 ether}(pubkeys, withdrawalCredentials, signatures, depositDataRoots, amount);
+    }
+
+    function testDeposit65EthWithUnknownCredentialsReverts() public {
+        (
+            bytes[] memory pubkeys,
+            bytes memory withdrawalCredentials,
+            bytes[] memory signatures,
+            bytes32[] memory depositDataRoots,
+            uint256 amount
+        ) = _multiDepositData(1, 65 ether, 0x03);
+
+        vm.expectRevert(bytes("P2pEth2Depositor: large deposit requires 0x02"));
         depositor.deposit{value: 65 ether}(pubkeys, withdrawalCredentials, signatures, depositDataRoots, amount);
     }
 
@@ -284,9 +310,26 @@ contract P2pEth2DepositorForkTest is Test {
         _replayBatch(pubkeys, withdrawalCredentials, signatures, depositDataRoots, amount);
     }
 
-    function testMainnetFork_Deposit32Point1Eth_0x00Credentials() public {
+    function testMainnetFork_Deposit32Point1Eth_0x00CredentialsReverts() public {
         if (!_setupFork("ETH_RPC_URL_MAINNET")) return;
-        _replayFixture(_mainnet32Point1EthFixture());
+
+        DepositFixture memory fixture = _mainnet32Point1EthFixture();
+        bytes[] memory pubkeys = new bytes[](1);
+        bytes[] memory signatures = new bytes[](1);
+        bytes32[] memory roots = new bytes32[](1);
+
+        pubkeys[0] = fixture.pubkey;
+        signatures[0] = fixture.signature;
+        roots[0] = fixture.depositDataRoot;
+
+        vm.expectRevert(bytes("P2pEth2Depositor: large deposit requires 0x02"));
+        depositor.deposit{value: fixture.amount}(
+            pubkeys,
+            fixture.withdrawalCredentials,
+            signatures,
+            roots,
+            fixture.amount
+        );
     }
 
     function testHoodiFork_Deposit33Eth_0x02Credentials() public {
