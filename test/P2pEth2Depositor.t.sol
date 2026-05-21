@@ -112,6 +112,45 @@ contract P2pEth2DepositorTest is Test {
         depositor.deposit{value: 31 ether}(pubkeys, withdrawalCredentials, signatures, depositDataRoots, amount);
     }
 
+    function testAmountZeroReverts() public {
+        (
+            bytes[] memory pubkeys,
+            bytes memory withdrawalCredentials,
+            bytes[] memory signatures,
+            bytes32[] memory depositDataRoots,
+            uint256 amount
+        ) = _multiDepositData(1, 0, 0x01);
+
+        vm.expectRevert(bytes("P2pEth2Depositor: amount below minimum"));
+        depositor.deposit{value: 0}(pubkeys, withdrawalCredentials, signatures, depositDataRoots, amount);
+    }
+
+    function testAmountBelowOneEtherReverts() public {
+        uint256 amount = 1 ether - 1 wei;
+        (
+            bytes[] memory pubkeys,
+            bytes memory withdrawalCredentials,
+            bytes[] memory signatures,
+            bytes32[] memory depositDataRoots,
+        ) = _multiDepositData(1, amount, 0x01);
+
+        vm.expectRevert(bytes("P2pEth2Depositor: amount below minimum"));
+        depositor.deposit{value: amount}(pubkeys, withdrawalCredentials, signatures, depositDataRoots, amount);
+    }
+
+    function testAmountNotGweiAlignedReverts() public {
+        uint256 amount = 1 ether + 1 wei;
+        (
+            bytes[] memory pubkeys,
+            bytes memory withdrawalCredentials,
+            bytes[] memory signatures,
+            bytes32[] memory depositDataRoots,
+        ) = _multiDepositData(1, amount, 0x01);
+
+        vm.expectRevert(bytes("P2pEth2Depositor: amount not gwei-aligned"));
+        depositor.deposit{value: amount}(pubkeys, withdrawalCredentials, signatures, depositDataRoots, amount);
+    }
+
     function testSignaturesLengthMismatchReverts() public {
         (
             bytes[] memory pubkeys,
@@ -127,7 +166,7 @@ contract P2pEth2DepositorTest is Test {
     }
 
     function testAmountAbove2048EthReverts() public {
-        uint256 amount = 2048 ether + 1 wei;
+        uint256 amount = 2048 ether + 1 gwei;
         (
             bytes[] memory pubkeys,
             bytes memory withdrawalCredentials,

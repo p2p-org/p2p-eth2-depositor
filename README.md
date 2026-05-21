@@ -49,7 +49,7 @@ How to Use
 2. Build arrays of `pubkeys`, `signatures`, and `deposit_data_roots` (length = number of validators). Each pubkey in the batch must be unique. Provide a single 32-byte `withdrawal_credentials` blob shared by all validators in the batch, and a single `amount` (ETH per validator).
 3. Call `deposit` on `P2pEth2Depositor` with `msg.value` equal to **`amount * number_of_validators`**.
 
-The batch `amount` must not exceed **2048 ETH** per validator. There is **no minimum** enforced by this contract; use amounts appropriate for your chain and tooling.
+The batch `amount` must be at least **1 ETH** per validator, divisible by **1 gwei**, and no more than **2048 ETH** per validator.
 
 Duplicate pubkeys in one transaction will revert because repeated pubkeys top up an existing validator instead of creating distinct validators.
 

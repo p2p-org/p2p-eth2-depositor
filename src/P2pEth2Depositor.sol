@@ -27,6 +27,8 @@ contract P2pEth2Depositor is Pausable, Ownable {
      * @dev Per-validator deposit upper bound (`amount <= maxCollateral`).
      * `collateral` is the 32 ETH threshold used only for the large-deposit withdrawal-credentials guard (`amount > collateral`).
      */
+    uint256 public constant minDepositAmount = 1 ether;
+    uint256 public constant gweiUnit = 1 gwei;
     uint256 public constant collateral = 32 ether;
     uint256 public constant maxCollateral = 2048 ether;
 
@@ -71,6 +73,8 @@ contract P2pEth2Depositor is Pausable, Ownable {
             deposit_data_roots.length == validatorCount,
             "P2pEth2Depositor: amount of parameters do no match");
         require(withdrawal_credentials.length == credentialsLength, "P2pEth2Depositor: wrong withdrawal credentials");
+        require(amount >= minDepositAmount, "P2pEth2Depositor: amount below minimum");
+        require(amount % gweiUnit == 0, "P2pEth2Depositor: amount not gwei-aligned");
         require(amount <= maxCollateral, "P2pEth2Depositor: amount is above maximum");
         if (amount > collateral) {
             require(
