@@ -12,7 +12,7 @@ contract P2pEth2DepositorTest is Test {
 
     function setUp() public {
         vm.deal(address(this), 100_000 ether);
-        depositor = new P2pEth2Depositor();
+        depositor = new P2pEth2Depositor(address(this));
     }
 
     function testZeroValidatorsReverts() public {
@@ -69,7 +69,33 @@ contract P2pEth2DepositorTest is Test {
             uint256 amount
         ) = _multiDepositData(1, 65 ether, 0x01);
 
-        vm.expectRevert(bytes("P2pEth2Depositor: large deposit cannot use 0x01"));
+        vm.expectRevert(bytes("P2pEth2Depositor: large deposit requires 0x02"));
+        depositor.deposit{value: 65 ether}(pubkeys, withdrawalCredentials, signatures, depositDataRoots, amount);
+    }
+
+    function testDeposit65EthWith0x00CredentialsReverts() public {
+        (
+            bytes[] memory pubkeys,
+            bytes memory withdrawalCredentials,
+            bytes[] memory signatures,
+            bytes32[] memory depositDataRoots,
+            uint256 amount
+        ) = _multiDepositData(1, 65 ether, 0x00);
+
+        vm.expectRevert(bytes("P2pEth2Depositor: large deposit requires 0x02"));
+        depositor.deposit{value: 65 ether}(pubkeys, withdrawalCredentials, signatures, depositDataRoots, amount);
+    }
+
+    function testDeposit65EthWithUnknownCredentialsReverts() public {
+        (
+            bytes[] memory pubkeys,
+            bytes memory withdrawalCredentials,
+            bytes[] memory signatures,
+            bytes32[] memory depositDataRoots,
+            uint256 amount
+        ) = _multiDepositData(1, 65 ether, 0x03);
+
+        vm.expectRevert(bytes("P2pEth2Depositor: large deposit requires 0x02"));
         depositor.deposit{value: 65 ether}(pubkeys, withdrawalCredentials, signatures, depositDataRoots, amount);
     }
 
@@ -84,6 +110,45 @@ contract P2pEth2DepositorTest is Test {
 
         vm.expectRevert(bytes("P2pEth2Depositor: ETH sent must equal sum of amounts"));
         depositor.deposit{value: 31 ether}(pubkeys, withdrawalCredentials, signatures, depositDataRoots, amount);
+    }
+
+    function testAmountZeroReverts() public {
+        (
+            bytes[] memory pubkeys,
+            bytes memory withdrawalCredentials,
+            bytes[] memory signatures,
+            bytes32[] memory depositDataRoots,
+            uint256 amount
+        ) = _multiDepositData(1, 0, 0x01);
+
+        vm.expectRevert(bytes("P2pEth2Depositor: amount below minimum"));
+        depositor.deposit{value: 0}(pubkeys, withdrawalCredentials, signatures, depositDataRoots, amount);
+    }
+
+    function testAmountBelowOneEtherReverts() public {
+        uint256 amount = 1 ether - 1 wei;
+        (
+            bytes[] memory pubkeys,
+            bytes memory withdrawalCredentials,
+            bytes[] memory signatures,
+            bytes32[] memory depositDataRoots,
+        ) = _multiDepositData(1, amount, 0x01);
+
+        vm.expectRevert(bytes("P2pEth2Depositor: amount below minimum"));
+        depositor.deposit{value: amount}(pubkeys, withdrawalCredentials, signatures, depositDataRoots, amount);
+    }
+
+    function testAmountNotGweiAlignedReverts() public {
+        uint256 amount = 1 ether + 1 wei;
+        (
+            bytes[] memory pubkeys,
+            bytes memory withdrawalCredentials,
+            bytes[] memory signatures,
+            bytes32[] memory depositDataRoots,
+        ) = _multiDepositData(1, amount, 0x01);
+
+        vm.expectRevert(bytes("P2pEth2Depositor: amount not gwei-aligned"));
+        depositor.deposit{value: amount}(pubkeys, withdrawalCredentials, signatures, depositDataRoots, amount);
     }
 
     function testSignaturesLengthMismatchReverts() public {
@@ -101,7 +166,7 @@ contract P2pEth2DepositorTest is Test {
     }
 
     function testAmountAbove2048EthReverts() public {
-        uint256 amount = 2048 ether + 1 wei;
+        uint256 amount = 2048 ether + 1 gwei;
         (
             bytes[] memory pubkeys,
             bytes memory withdrawalCredentials,
@@ -176,10 +241,41 @@ contract P2pEth2DepositorTest is Test {
         depositor.unpause();
     }
 
+    function testCannotRenounceOwnershipWhilePaused() public {
+        depositor.pause();
+
+        vm.expectRevert(bytes("P2pEth2Depositor: cannot renounce while paused"));
+        depositor.renounceOwnership();
+
+        assertEq(depositor.owner(), address(this));
+        depositor.unpause();
+        assertFalse(depositor.paused());
+    }
+
+    function testCanRenounceOwnershipWhenUnpaused() public {
+        depositor.renounceOwnership();
+
+        assertEq(depositor.owner(), address(0));
+    }
+
     function testDirectEthTransferReverts() public {
         (bool success,) = address(depositor).call{value: 1 ether}("");
 
         assertFalse(success);
+    }
+
+    function testConstructorRevertsOnZeroAddress() public {
+        vm.expectRevert(bytes("P2pEth2Depositor: zero deposit contract"));
+        new P2pEth2Depositor(address(0));
+    }
+
+    function testConstructorRevertsOnNoCode() public {
+        vm.expectRevert(bytes("P2pEth2Depositor: deposit contract has no code"));
+        new P2pEth2Depositor(address(0xBEEF));
+    }
+
+    function testConstructorStoresDepositContract() public view {
+        require(address(depositor.depositContract()) == address(this), "wrong deposit contract");
     }
 
     function _multiDepositData(uint256 n, uint256 amount, bytes1 withdrawalPrefix)
@@ -240,9 +336,26 @@ contract P2pEth2DepositorForkTest is Test {
         _replayBatch(pubkeys, withdrawalCredentials, signatures, depositDataRoots, amount);
     }
 
-    function testMainnetFork_Deposit32Point1Eth_0x00Credentials() public {
+    function testMainnetFork_Deposit32Point1Eth_0x00CredentialsReverts() public {
         if (!_setupFork("ETH_RPC_URL_MAINNET")) return;
-        _replayFixture(_mainnet32Point1EthFixture());
+
+        DepositFixture memory fixture = _mainnet32Point1EthFixture();
+        bytes[] memory pubkeys = new bytes[](1);
+        bytes[] memory signatures = new bytes[](1);
+        bytes32[] memory roots = new bytes32[](1);
+
+        pubkeys[0] = fixture.pubkey;
+        signatures[0] = fixture.signature;
+        roots[0] = fixture.depositDataRoot;
+
+        vm.expectRevert(bytes("P2pEth2Depositor: large deposit requires 0x02"));
+        depositor.deposit{value: fixture.amount}(
+            pubkeys,
+            fixture.withdrawalCredentials,
+            signatures,
+            roots,
+            fixture.amount
+        );
     }
 
     function testHoodiFork_Deposit33Eth_0x02Credentials() public {
@@ -264,7 +377,7 @@ contract P2pEth2DepositorForkTest is Test {
 
             vm.createSelectFork(rpcUrl);
             vm.deal(address(this), 1_000_000 ether);
-            depositor = new P2pEth2Depositor();
+            depositor = new P2pEth2Depositor(CANONICAL_DEPOSIT_CONTRACT);
             return true;
         } catch {
             emit log(string.concat("Skipping fork test: ", rpcEnvVar, " is not set"));
@@ -304,7 +417,7 @@ contract P2pEth2DepositorForkTest is Test {
         _assertCanonicalDepositEvents(entries, validatorCount, amount);
     }
 
-    function _assertWrapperDepositEvent(Vm.Log[] memory entries, uint256 validatorCount, uint256 totalAmount) internal {
+    function _assertWrapperDepositEvent(Vm.Log[] memory entries, uint256 validatorCount, uint256 totalAmount) internal view {
         bytes32 indexedSender = bytes32(uint256(uint160(address(this))));
 
         for (uint256 i; i < entries.length; ++i) {
@@ -314,16 +427,16 @@ contract P2pEth2DepositorForkTest is Test {
             ) {
                 (uint256 emittedValidatorCount, uint256 emittedTotalAmount) =
                     abi.decode(entries[i].data, (uint256, uint256));
-                assertEq(emittedValidatorCount, validatorCount);
-                assertEq(emittedTotalAmount, totalAmount);
+                require(emittedValidatorCount == validatorCount, "wrong wrapper validator count");
+                require(emittedTotalAmount == totalAmount, "wrong wrapper total amount");
                 return;
             }
         }
 
-        fail("wrapper DepositEvent not emitted");
+        revert("wrapper DepositEvent not emitted");
     }
 
-    function _assertCanonicalDepositEvents(Vm.Log[] memory entries, uint256 validatorCount, uint256 amount) internal {
+    function _assertCanonicalDepositEvents(Vm.Log[] memory entries, uint256 validatorCount, uint256 amount) internal pure {
         uint256 expectedAmountGwei = amount / 1 gwei;
         uint256 observedEvents;
 
@@ -333,12 +446,12 @@ contract P2pEth2DepositorForkTest is Test {
                     && entries[i].topics[0] == CANONICAL_DEPOSIT_EVENT_TOPIC
             ) {
                 (,, bytes memory encodedAmount,,) = abi.decode(entries[i].data, (bytes, bytes, bytes, bytes, bytes));
-                assertEq(_decodeLittleEndianUint64(encodedAmount), expectedAmountGwei);
+                require(_decodeLittleEndianUint64(encodedAmount) == expectedAmountGwei, "wrong canonical amount");
                 observedEvents += 1;
             }
         }
 
-        assertEq(observedEvents, validatorCount);
+        require(observedEvents == validatorCount, "wrong canonical event count");
     }
 
     function _decodeLittleEndianUint64(bytes memory encodedAmount) internal pure returns (uint256 amount) {

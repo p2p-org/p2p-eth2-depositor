@@ -9,9 +9,9 @@ import "./interfaces/IDepositContract.sol";
 contract P2pEth2Depositor is Pausable, Ownable {
 
     /**
-     * @dev Eth2 Deposit Contract address.
+     * @dev Eth2 Deposit Contract address set at deployment.
      */
-    IDepositContract public constant depositContract = IDepositContract(0x00000000219ab540356cBB839Cbe05303d7705Fa);
+    IDepositContract public immutable depositContract;
 
     /**
      * @dev Minimum and maximum number of validators (deposit entries) per transaction.
@@ -21,16 +21,22 @@ contract P2pEth2Depositor is Pausable, Ownable {
     uint256 public constant pubkeyLength = 48;
     uint256 public constant credentialsLength = 32;
     uint256 public constant signatureLength = 96;
-    bytes1 public constant ETH1_WITHDRAWAL_PREFIX = 0x01;
+    bytes1 public constant COMPOUNDING_WITHDRAWAL_PREFIX = 0x02;
 
     /**
      * @dev Per-validator deposit upper bound (`amount <= maxCollateral`).
      * `collateral` is the 32 ETH threshold used only for the large-deposit withdrawal-credentials guard (`amount > collateral`).
      */
+    uint256 public constant minDepositAmount = 1 ether;
+    uint256 public constant gweiUnit = 1 gwei;
     uint256 public constant collateral = 32 ether;
     uint256 public constant maxCollateral = 2048 ether;
 
-    constructor() Ownable(msg.sender) {}
+    constructor(address depositContract_) Ownable(msg.sender) {
+        require(depositContract_ != address(0), "P2pEth2Depositor: zero deposit contract");
+        require(depositContract_.code.length > 0, "P2pEth2Depositor: deposit contract has no code");
+        depositContract = IDepositContract(depositContract_);
+    }
 
     /**
      * @dev This contract will not accept direct ETH transactions.
@@ -67,9 +73,14 @@ contract P2pEth2Depositor is Pausable, Ownable {
             deposit_data_roots.length == validatorCount,
             "P2pEth2Depositor: amount of parameters do no match");
         require(withdrawal_credentials.length == credentialsLength, "P2pEth2Depositor: wrong withdrawal credentials");
+        require(amount >= minDepositAmount, "P2pEth2Depositor: amount below minimum");
+        require(amount % gweiUnit == 0, "P2pEth2Depositor: amount not gwei-aligned");
         require(amount <= maxCollateral, "P2pEth2Depositor: amount is above maximum");
         if (amount > collateral) {
-            require(withdrawal_credentials[0] != ETH1_WITHDRAWAL_PREFIX, "P2pEth2Depositor: large deposit cannot use 0x01");
+            require(
+                withdrawal_credentials[0] == COMPOUNDING_WITHDRAWAL_PREFIX,
+                "P2pEth2Depositor: large deposit requires 0x02"
+            );
         }
 
         uint256 totalAmount = amount * validatorCount;
@@ -78,7 +89,9 @@ contract P2pEth2Depositor is Pausable, Ownable {
         for (uint256 i = 0; i < validatorCount; ++i) {
             require(pubkeys[i].length == pubkeyLength, "P2pEth2Depositor: wrong pubkey");
             require(signatures[i].length == signatureLength, "P2pEth2Depositor: wrong signatures");
+        }
 
+        for (uint256 i = 0; i < validatorCount; ++i) {
             depositContract.deposit{value: amount}(
                 pubkeys[i],
                 withdrawal_credentials,
@@ -97,7 +110,7 @@ contract P2pEth2Depositor is Pausable, Ownable {
      *
      * - The contract must not be paused.
      */
-    function pause() public onlyOwner {
+    function pause() external onlyOwner {
         _pause();
     }
 
@@ -108,8 +121,16 @@ contract P2pEth2Depositor is Pausable, Ownable {
      *
      * - The contract must be paused.
      */
-    function unpause() public onlyOwner {
+    function unpause() external onlyOwner {
         _unpause();
+    }
+
+    /**
+     * @dev Renouncing ownership while paused would leave the wrapper permanently paused.
+     */
+    function renounceOwnership() public override onlyOwner {
+        require(!paused(), "P2pEth2Depositor: cannot renounce while paused");
+        super.renounceOwnership();
     }
 
     event DepositEvent(

@@ -33,10 +33,14 @@ Deployment (Mainnet)
 
 ```bash    
 forge create --rpc-url https://mainnet.infura.io/v3/<YOUR INFURA KEY> \
-    --private-key <YOUR PRIVATE KEY> src/P2pEth2Depositor.sol:P2pEth2Depositor \
+    --private-key <YOUR PRIVATE KEY> \
+    src/P2pEth2Depositor.sol:P2pEth2Depositor \
+    --constructor-args 0x00000000219ab540356cBB839Cbe05303d7705Fa \
     --etherscan-api-key <YOUR ETHERSCAN API KEY> \
     --verify
 ```
+
+Pass the canonical DepositContract address for the target network as the constructor argument. Ethereum mainnet and Hoodi both use `0x00000000219ab540356cBB839Cbe05303d7705Fa`.
 
 How to Use
 ------------
@@ -45,9 +49,11 @@ How to Use
 2. Build arrays of `pubkeys`, `signatures`, and `deposit_data_roots` (length = number of validators). Provide a single 32-byte `withdrawal_credentials` blob shared by all validators in the batch, and a single `amount` (ETH per validator).
 3. Call `deposit` on `P2pEth2Depositor` with `msg.value` equal to **`amount * number_of_validators`**.
 
-The batch `amount` must not exceed **2048 ETH** per validator. There is **no minimum** enforced by this contract; use amounts appropriate for your chain and tooling.
+The batch `amount` must be at least **1 ETH** per validator, divisible by **1 gwei**, and no more than **2048 ETH** per validator.
 
-Deposits **strictly above 32 ETH** reject withdrawal credentials whose first byte is execution-withdrawal **`0x01`**. Other prefixes such as **`0x00`**, **`0x02`**, and future 32-byte credential formats are allowed. Deposits **at most 32 ETH** remain credential-type independent aside from length.
+ Operators should ensure pubkeys are unique off-chain because repeated pubkeys can top up an existing validator instead of creating distinct validators.
+
+Deposits **strictly above 32 ETH** require compounding withdrawal credentials whose first byte is **`0x02`**. Deposits **at most 32 ETH** remain credential-type independent aside from length.
 
 On success, the contract emits **`DepositEvent(from, validatorCount, totalAmount)`**.
 
